@@ -1,0 +1,1 @@
+worker: python glago_bot.py
