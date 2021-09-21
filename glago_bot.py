@@ -1,11 +1,12 @@
 # -*- coding: utf-8 -*-
 
 import hashlib
+import sqlite3
 from aiogram import Bot, types
 from aiogram.dispatcher import Dispatcher
 from aiogram.utils import executor
-from aiogram.types import InlineQuery, InputTextMessageContent, InlineQueryResultArticle, InlineKeyboardMarkup, InlineKeyboardButton
-
+from aiogram.types import InlineQuery, InputTextMessageContent, InlineQueryResultArticle, InlineKeyboardMarkup, \
+    InlineKeyboardButton
 
 bot = Bot(token="1936543415:AAE4z01Zxsz6j7EUjwOpxSZLbHmJ6mcw-QU")
 dp = Dispatcher(bot)
@@ -13,9 +14,63 @@ i = 1
 y = 1
 
 
+class SQLighter:
+
+    def __init__(self, database):
+        self.connection = sqlite3.connect(database)
+        self.cursor = self.connection.cursor()
+
+    def user_exists(self, user_id):
+        with self.connection:
+            result = self.cursor.execute("SELECT * FROM `users` WHERE `user_id` = ?", (user_id,)).fetchall()
+            return bool(len(result))
+
+    def add_user(self, user_id, settingi, settingy):
+        with self.connection:
+            return self.cursor.execute("INSERT INTO `users` (`user_id`, `settingi`, `settingy`) VALUES(?,?,?)",
+                                       (user_id, settingi, settingy,))
+
+    def update_user_settingi(self, settingi, user_id):
+        with self.connection:
+            update = self.cursor.execute("UPDATE `users` SET `settingi` = ? WHERE `user_id` = ?",
+                                         (settingi, user_id,))
+            return update
+
+    def update_user_settingy(self, settingy, user_id):
+        with self.connection:
+            update = self.cursor.execute("UPDATE `users` SET `settingy` = ? WHERE `user_id` = ?",
+                                         (settingy, user_id,))
+            return update
+
+    def set_user_settingi(self, user_id):
+        with self.connection:
+            global i
+            resulti = self.cursor.execute("SELECT `settingi` FROM `users` WHERE `user_id` = ?", (user_id,)).fetchone()
+            i = resulti[0]
+            return i
+
+    def set_user_settingy(self, user_id):
+        with self.connection:
+            global y
+            resulty = self.cursor.execute("SELECT `settingy` FROM `users` WHERE `user_id` = ?", (user_id,)).fetchone()
+            y = resulty[0]
+            return y
+
+    def close(self):
+        self.connection.close()
+
+
+db = SQLighter("users.db")
+
+
 @dp.message_handler(commands=["start"])
 async def process_start_command(message: types.Message):
-    await message.reply("Здоровенькі були, введите ваш текст для перевода")
+    await message.reply(f"Здоровенькі були, введите ваш текст для перевода")
+    global db
+    global i
+    global y
+    if not db.user_exists(message.from_user.id):
+        db.add_user(message.from_user.id, i, y)
 
 
 @dp.message_handler(commands=["site"])
@@ -27,7 +82,13 @@ async def process_site_command(message: types.Message):
 
 @dp.message_handler(commands=["about"])
 async def process_about_command(message: types.Message):
-    await message.reply("Глаголица — первый славянский алфавит. Создан в середине IX века византийскими миссионерами, братьями Кириллом и Мефодием, для перевода богослужебных текстов с греческого языка на старославянский.\nГлаголица использовалась как в качестве непосредственно старославянского алфавита, так и в качестве тайнописи(так её использовали на Руси). Ативно использовалась в церковной жизни в Хорватии. К хорватским глаголическим памятникам относится, в частности, знаменитая Башчанская плита.\nЧто же касается кириллицы, то её разработали ученики Кирилла несколько позже.")
+    await message.reply("Глаголица — \
+    первый славянский алфавит. Создан в середине IX века византийскими миссионерами,\
+    братьями Кириллом и Мефодием, для перевода богослужебных текстов с греческого языка на старославянский.\n\
+    Глаголица использовалась как в качестве непосредственно старославянского алфавита, так и в качестве тайнописи\
+    (так её использовали на Руси). Ативно использовалась в церковной жизни в Хорватии. К хорватским глаголическим\
+    памятникам относится, в частности, знаменитая Башчанская плита.\nЧто же касается кириллицы, то её разработали\
+    ученики Кирилла несколько позже.")
 
 
 @dp.message_handler(commands=["settings"])
@@ -46,52 +107,47 @@ async def process_callback_settingi(callback_query: types.CallbackQuery):
     settingi3 = InlineKeyboardButton("И = Ⰻ, І = Ⰺ", callback_data="i3")
     settingi4 = InlineKeyboardButton("И = Ⰻ, І = Ⰹ", callback_data="i4")
     settingi5 = InlineKeyboardButton("И = Ⰺ, І = Ⰹ", callback_data="i5")
-    settingi6 = InlineKeyboardButton("И = Ⰹ, І = Ⰺ",  callback_data="i6")
+    settingi6 = InlineKeyboardButton("И = Ⰹ, І = Ⰺ", callback_data="i6")
     settingiback = InlineKeyboardButton("Назад", callback_data="iback")
-    settingsi = InlineKeyboardMarkup().add(settingi1, settingi2, settingi3, settingi4, settingi5, settingi6, settingiback)
+    settingsi = InlineKeyboardMarkup().add(settingi1, settingi2, settingi3, settingi4, settingi5, settingi6,
+                                           settingiback)
     await bot.send_message(callback_query.from_user.id, "Отображение литер И и І", reply_markup=settingsi)
 
 
 @dp.callback_query_handler(lambda c: c.data == "i1")
 async def process_callback_settingi1(callback_query: types.CallbackQuery):
     await bot.answer_callback_query(callback_query.id, "Настройки изменены")
-    global i
-    i = 1
+    db.update_user_settingi(settingi=1, user_id=callback_query.from_user.id)
 
 
 @dp.callback_query_handler(lambda c: c.data == "i2")
 async def process_callback_settingi2(callback_query: types.CallbackQuery):
     await bot.answer_callback_query(callback_query.id, "Настройки изменены")
-    global i
-    i = 2
+    db.update_user_settingi(settingi=2, user_id=callback_query.from_user.id)
 
 
 @dp.callback_query_handler(lambda c: c.data == "i3")
 async def process_callback_settingi3(callback_query: types.CallbackQuery):
     await bot.answer_callback_query(callback_query.id, "Настройки изменены")
-    global i
-    i = 3
+    db.update_user_settingi(settingi=3, user_id=callback_query.from_user.id)
 
 
 @dp.callback_query_handler(lambda c: c.data == "i4")
 async def process_callback_settingi4(callback_query: types.CallbackQuery):
     await bot.answer_callback_query(callback_query.id, "Настройки изменены")
-    global i
-    i = 4
+    db.update_user_settingi(settingi=4, user_id=callback_query.from_user.id)
 
 
 @dp.callback_query_handler(lambda c: c.data == "i5")
 async def process_callback_settingi5(callback_query: types.CallbackQuery):
     await bot.answer_callback_query(callback_query.id, "Настройки изменены")
-    global i
-    i = 5
+    db.update_user_settingi(settingi=5, user_id=callback_query.from_user.id)
 
 
 @dp.callback_query_handler(lambda c: c.data == "i6")
 async def process_callback_settingi6(callback_query: types.CallbackQuery):
     await bot.answer_callback_query(callback_query.id, "Настройки изменены")
-    global i
-    i = 6
+    db.update_user_settingi(settingi=6, user_id=callback_query.from_user.id)
 
 
 @dp.callback_query_handler(lambda c: c.data == "iback")
@@ -117,22 +173,19 @@ async def process_callback_settingy(callback_query: types.CallbackQuery):
 @dp.callback_query_handler(lambda c: c.data == "y1")
 async def process_callback_settingy1(callback_query: types.CallbackQuery):
     await bot.answer_callback_query(callback_query.id, "Настройки изменены")
-    global y
-    y = 1
+    db.update_user_settingy(settingy=1, user_id=callback_query.from_user.id)
 
 
 @dp.callback_query_handler(lambda c: c.data == "y2")
 async def process_callback_settingy2(callback_query: types.CallbackQuery):
     await bot.answer_callback_query(callback_query.id, "Настройки изменены")
-    global y
-    y = 2
+    db.update_user_settingy(settingy=2, user_id=callback_query.from_user.id)
 
 
 @dp.callback_query_handler(lambda c: c.data == "y3")
 async def process_callback_settingy3(callback_query: types.CallbackQuery):
     await bot.answer_callback_query(callback_query.id, "Настройки изменены")
-    global y
-    y = 3
+    db.update_user_settingy(settingy=3, user_id=callback_query.from_user.id)
 
 
 @dp.callback_query_handler(lambda c: c.data == "yback")
@@ -148,48 +201,58 @@ async def process_callback_settingyback(callback_query: types.CallbackQuery):
 async def translate(message: types.Message):
     global i
     global y
-    str = message.text
-    kirilltext = ["А", "а", "Б", "б", "В", "в", "Г", "г", "Д", "д", "Е", "е", "Ж", "ж", "Ѕ", "ѕ", "З", "з", "И", "и", "І", "і", "Ћ", "ћ", "К", "к", "Л", "л", "М", "м", "Н", "н", "О", "о", "П", "п", "Р", "р", "С", "с", "Т", "т", "Ѵ", "ѵ", "У", "у", "Ф", "ф", "Х", "х", "Ѡ", "ѡ", "Ц", "ц", "Ч", "ч", "Ш", "ш", "Щ", "щ", "Ъ", "ъ", "Ы", "ы", "Ь", "ь", "Ѣ", "ѣ", "Ё", "ё", "Ю", "ю", "Ѧ", "ѧ", "Ѩ", "ѩ", "Ѫ", "ѫ", "Ѭ", "ѭ", "Ѳ", "ѳ"]
-    glagoltext = ["Ⰰ", "ⰰ", "Ⰱ", "ⰱ", "Ⰲ", "ⰲ", "Ⰳ", "ⰳ", "Ⰴ", "ⰴ", "Ⰵ", "ⰵ", "Ⰶ", "ⰶ", "Ⰷ", "ⰷ", "Ⰸ", "ⰸ", "Ⰺ", "ⰺ", "Ⰹ", "ⰹ", "Ⰻ", "ⰻ", "Ⰼ", "ⰼ", "Ⰽ", "ⰽ", "Ⰾ", "ⰾ", "Ⰿ", "ⰿ", "Ⱀ", "ⱀ", "Ⱁ", "ⱁ", "Ⱂ", "ⱂ", "Ⱃ", "ⱃ", "Ⱄ", "ⱄ", "Ⱅ", "ⱅ", "Ⱛ", "ⱛ", "Ⱆ", "ⱆ", "Ⱇ", "ⱇ", "ⱇ", "Ⱈ", "ⱈ", "Ⱉ", "ⱉ", "Ⱌ", "ⱌ", "Ⱍ", "ⱍ", "Ⱎ", "ⱎ", "Ⱋ", "ⱋ", "Ⱏ", "ⱏ", "Ⱐ", "ⱐ", "Ⱑ", "ⱑ", "Ⱖ", "ⱖ", "Ⱓ", "ⱓ", "Ⱔ", "ⱔ", "Ⱗ", "ⱗ", "Ⱘ", "ⱘ", "Ⱙ", "ⱙ", "Ⱚ", "ⱚ"]
+    normaltext = message.text
+    kirilltext = ["А", "а", "Б", "б", "В", "в", "Г", "г", "Д", "д", "Е", "е", "Ж", "ж", "Ѕ", "ѕ", "З", "з", "И", "и",
+                  "І", "і", "Ћ", "ћ", "К", "к", "Л", "л", "М", "м", "Н", "н", "О", "о", "П", "п", "Р", "р", "С", "с",
+                  "Т", "т", "Ѵ", "ѵ", "У", "у", "Ф", "ф", "Х", "х", "Ѡ", "ѡ", "Ц", "ц", "Ч", "ч", "Ш", "ш", "Щ", "щ",
+                  "Ъ", "ъ", "Ы", "ы", "Ь", "ь", "Ѣ", "ѣ", "Ё", "ё", "Ю", "ю", "Ѧ", "ѧ", "Ѩ", "ѩ", "Ѫ", "ѫ", "Ѭ", "ѭ",
+                  "Ѳ", "ѳ"]
+    glagoltext = ["Ⰰ", "ⰰ", "Ⰱ", "ⰱ", "Ⰲ", "ⰲ", "Ⰳ", "ⰳ", "Ⰴ", "ⰴ", "Ⰵ", "ⰵ", "Ⰶ", "ⰶ", "Ⰷ", "ⰷ", "Ⰸ", "ⰸ", "Ⰺ", "ⰺ",
+                  "Ⰹ", "ⰹ", "Ⰻ", "ⰻ", "Ⰼ", "ⰼ", "Ⰽ", "ⰽ", "Ⰾ", "ⰾ", "Ⰿ", "ⰿ", "Ⱀ", "ⱀ", "Ⱁ", "ⱁ", "Ⱂ", "ⱂ", "Ⱃ", "ⱃ",
+                  "Ⱄ", "ⱄ", "Ⱅ", "ⱅ", "Ⱛ", "ⱛ", "Ⱆ", "ⱆ", "Ⱇ", "ⱇ", "ⱇ", "Ⱈ", "ⱈ", "Ⱉ", "ⱉ", "Ⱌ", "ⱌ", "Ⱍ", "ⱍ", "Ⱎ",
+                  "ⱎ", "Ⱋ", "ⱋ", "Ⱏ", "ⱏ", "Ⱐ", "ⱐ", "Ⱑ", "ⱑ", "Ⱖ", "ⱖ", "Ⱓ", "ⱓ", "Ⱔ", "ⱔ", "Ⱗ", "ⱗ", "Ⱘ", "ⱘ", "Ⱙ",
+                  "ⱙ", "Ⱚ", "ⱚ"]
+    db.set_user_settingi(message.from_user.id)
+    db.set_user_settingy(message.from_user.id)
 
-    if any(text in str for text in kirilltext):
-        glagol = str.replace("А", "Ⰰ").replace("а", "ⰰ")\
-            .replace("Б", "Ⰱ").replace("б", "ⰱ")\
-            .replace("В", "Ⰲ").replace("в", "ⰲ")\
-            .replace("Г", "Ⰳ").replace("г", "ⰳ")\
-            .replace("Д", "Ⰴ").replace("д", "ⰴ")\
-            .replace("Е", "Ⰵ").replace("е", "ⰵ")\
-            .replace("Ж", "Ⰶ").replace("ж", "ⰶ")\
-            .replace("Ѕ", "Ⰷ").replace("ѕ", "ⰷ")\
-            .replace("З", "Ⰸ").replace("з", "ⰸ")\
-            .replace("Ћ", "Ⰼ").replace("ћ", "ⰼ")\
-            .replace("К", "Ⰽ").replace("к", "ⰽ")\
-            .replace("Л", "Ⰾ").replace("л", "ⰾ")\
-            .replace("М", "Ⰿ").replace("м", "ⰿ")\
-            .replace("Н", "Ⱀ").replace("н", "ⱀ")\
-            .replace("О", "Ⱁ").replace("о", "ⱁ")\
-            .replace("П", "Ⱂ").replace("п", "ⱂ")\
-            .replace("Р", "Ⱃ").replace("р", "ⱃ")\
-            .replace("С", "Ⱄ").replace("с", "ⱄ")\
-            .replace("Т", "Ⱅ").replace("т", "ⱅ")\
-            .replace("Ѵ", "Ⱛ").replace("ѵ", "ⱛ")\
-            .replace("У", "Ⱆ").replace("у", "ⱆ")\
-            .replace("Ф", "Ⱇ").replace("ф", "ⱇ")\
-            .replace("Х", "Ⱈ").replace("х", "ⱈ")\
-            .replace("Ѡ", "Ⱉ").replace("ѡ", "ⱉ")\
-            .replace("Ц", "Ⱌ").replace("ц", "ⱌ")\
-            .replace("Ч", "Ⱍ").replace("ч", "ⱍ")\
-            .replace("Ш", "Ⱎ").replace("ш", "ⱎ")\
-            .replace("Щ", "Ⱋ").replace("щ", "ⱋ")\
-            .replace("Ъ", "Ⱏ").replace("ъ", "ⱏ")\
-            .replace("Ь", "Ⱐ").replace("ь", "ⱐ")\
-            .replace("Ѣ", "Ⱑ").replace("ѣ", "ⱑ")\
-            .replace("Ё", "Ⱖ").replace("ё", "ⱖ")\
-            .replace("Ю", "Ⱓ").replace("ю", "ⱓ")\
-            .replace("Ѧ", "Ⱔ").replace("ѧ", "ⱔ")\
-            .replace("Ѩ", "Ⱗ").replace("ѩ", "ⱗ")\
-            .replace("Ѫ", "Ⱘ").replace("ѫ", "ⱘ")\
-            .replace("Ѭ", "Ⱙ").replace("ѭ", "ⱙ")\
+    if any(text in normaltext for text in kirilltext):
+        glagol = normaltext.replace("А", "Ⰰ").replace("а", "ⰰ") \
+            .replace("Б", "Ⰱ").replace("б", "ⰱ") \
+            .replace("В", "Ⰲ").replace("в", "ⰲ") \
+            .replace("Г", "Ⰳ").replace("г", "ⰳ") \
+            .replace("Д", "Ⰴ").replace("д", "ⰴ") \
+            .replace("Е", "Ⰵ").replace("е", "ⰵ") \
+            .replace("Ж", "Ⰶ").replace("ж", "ⰶ") \
+            .replace("Ѕ", "Ⰷ").replace("ѕ", "ⰷ") \
+            .replace("З", "Ⰸ").replace("з", "ⰸ") \
+            .replace("Ћ", "Ⰼ").replace("ћ", "ⰼ") \
+            .replace("К", "Ⰽ").replace("к", "ⰽ") \
+            .replace("Л", "Ⰾ").replace("л", "ⰾ") \
+            .replace("М", "Ⰿ").replace("м", "ⰿ") \
+            .replace("Н", "Ⱀ").replace("н", "ⱀ") \
+            .replace("О", "Ⱁ").replace("о", "ⱁ") \
+            .replace("П", "Ⱂ").replace("п", "ⱂ") \
+            .replace("Р", "Ⱃ").replace("р", "ⱃ") \
+            .replace("С", "Ⱄ").replace("с", "ⱄ") \
+            .replace("Т", "Ⱅ").replace("т", "ⱅ") \
+            .replace("Ѵ", "Ⱛ").replace("ѵ", "ⱛ") \
+            .replace("У", "Ⱆ").replace("у", "ⱆ") \
+            .replace("Ф", "Ⱇ").replace("ф", "ⱇ") \
+            .replace("Х", "Ⱈ").replace("х", "ⱈ") \
+            .replace("Ѡ", "Ⱉ").replace("ѡ", "ⱉ") \
+            .replace("Ц", "Ⱌ").replace("ц", "ⱌ") \
+            .replace("Ч", "Ⱍ").replace("ч", "ⱍ") \
+            .replace("Ш", "Ⱎ").replace("ш", "ⱎ") \
+            .replace("Щ", "Ⱋ").replace("щ", "ⱋ") \
+            .replace("Ъ", "Ⱏ").replace("ъ", "ⱏ") \
+            .replace("Ь", "Ⱐ").replace("ь", "ⱐ") \
+            .replace("Ѣ", "Ⱑ").replace("ѣ", "ⱑ") \
+            .replace("Ё", "Ⱖ").replace("ё", "ⱖ") \
+            .replace("Ю", "Ⱓ").replace("ю", "ⱓ") \
+            .replace("Ѧ", "Ⱔ").replace("ѧ", "ⱔ") \
+            .replace("Ѩ", "Ⱗ").replace("ѩ", "ⱗ") \
+            .replace("Ѫ", "Ⱘ").replace("ѫ", "ⱘ") \
+            .replace("Ѭ", "Ⱙ").replace("ѭ", "ⱙ") \
             .replace("Ѳ", "Ⱚ").replace("ѳ", "ⱚ")
 
         if y == 1:
@@ -200,62 +263,62 @@ async def translate(message: types.Message):
             glagol = glagol.replace("Ы", "ⰟⰋ").replace("ы", "ⱏⰻ")
 
         if i == 1:
-            glagol = glagol.replace("И", "Ⰺ").replace("и", "ⰺ")\
+            glagol = glagol.replace("И", "Ⰺ").replace("и", "ⰺ") \
                 .replace("І", "Ⰻ").replace("і", "ⰻ")
         elif i == 2:
-            glagol = glagol.replace("И", "Ⰹ").replace("и", "ⰹ")\
+            glagol = glagol.replace("И", "Ⰹ").replace("и", "ⰹ") \
                 .replace("І", "Ⰻ").replace("і", "ⰻ")
         elif i == 3:
-            glagol = glagol.replace("И", "Ⰻ").replace("и", "ⰻ")\
+            glagol = glagol.replace("И", "Ⰻ").replace("и", "ⰻ") \
                 .replace("І", "Ⰺ").replace("і", "ⰺ")
         elif i == 4:
-            glagol = glagol.replace("И", "Ⰻ").replace("и", "ⰻ")\
+            glagol = glagol.replace("И", "Ⰻ").replace("и", "ⰻ") \
                 .replace("І", "Ⰹ").replace("і", "ⰹ")
         elif i == 5:
-            glagol = glagol.replace("И", "Ⰺ").replace("и", "ⰺ")\
+            glagol = glagol.replace("И", "Ⰺ").replace("и", "ⰺ") \
                 .replace("І", "Ⰹ").replace("і", "ⰹ")
         elif i == 6:
-            glagol = glagol.replace("И", "Ⰹ").replace("и", "ⰹ")\
+            glagol = glagol.replace("И", "Ⰹ").replace("и", "ⰹ") \
                 .replace("І", "Ⰺ").replace("і", "ⰺ")
 
         await message.reply(glagol)
-    elif any(text in str for text in glagoltext):
-        kirill = str.replace("Ⰰ", "А").replace("ⰰ", "а")\
-            .replace("Ⰱ", "Б").replace("ⰱ", "б")\
-            .replace("Ⰲ", "В").replace("ⰲ", "в")\
-            .replace("Ⰳ", "Г").replace("ⰳ", "г")\
-            .replace("Ⰴ", "Д").replace("ⰴ", "д")\
-            .replace("Ⰵ", "Е").replace("ⰵ", "е")\
-            .replace("Ⰶ", "Ж").replace("ⰶ", "ж")\
-            .replace("Ⰷ", "Ѕ").replace("ⰷ", "ѕ")\
-            .replace("Ⰸ", "З").replace("ⰸ", "з")\
-            .replace("Ⰼ", "Ћ").replace("ⰼ", "ћ")\
-            .replace("Ⰽ", "к").replace("ⰽ", "к")\
-            .replace("Ⰾ", "Л").replace("ⰾ", "л")\
-            .replace("Ⰿ", "М").replace("ⰿ", "м")\
-            .replace("Ⱀ", "Н").replace("ⱀ", "н")\
-            .replace("Ⱁ", "О").replace("ⱁ", "о")\
-            .replace("Ⱂ", "П").replace("ⱂ", "п")\
-            .replace("Ⱃ", "Р").replace("ⱃ", "р")\
-            .replace("Ⱄ", "С").replace("ⱄ", "с")\
-            .replace("Ⱅ", "Т").replace("ⱅ", "т")\
-            .replace("Ⱛ", "Ѵ").replace("ⱛ", "ѵ")\
-            .replace("Ⱆ", "У").replace("ⱆ", "у")\
-            .replace("Ⱇ", "Ф").replace("ⱇ", "ф")\
-            .replace("Ⱈ", "Х").replace("ⱈ", "х")\
-            .replace("Ⱉ", "Ѡ").replace("ⱉ", "ѡ")\
-            .replace("Ⱌ", "Ц").replace("ⱌ", "ц")\
-            .replace("Ⱍ", "Ч").replace("ⱍ", "ч")\
-            .replace("Ⱎ", "Ш").replace("ⱎ", "ш")\
-            .replace("Ⱋ", "Щ").replace("ⱋ", "щ")\
-            .replace("Ⱐ", "Ь").replace("ⱐ", "ь")\
-            .replace("Ⱑ", "Ѣ").replace("ⱑ", "ѣ")\
-            .replace("Ⱖ", "Ё").replace("ⱖ", "ё")\
-            .replace("Ⱓ", "Ю").replace("ⱓ", "ю")\
-            .replace("Ⱔ", "Ѧ").replace("ⱔ", "ѧ")\
-            .replace("Ⱗ", "Ѩ").replace("ⱗ", "ѩ")\
-            .replace("Ⱘ", "Ѫ").replace("ⱘ", "ѫ")\
-            .replace("Ⱙ", "Ѭ").replace("ⱙ", "ѭ")\
+    elif any(text in normaltext for text in glagoltext):
+        kirill = normaltext.replace("Ⰰ", "А").replace("ⰰ", "а") \
+            .replace("Ⰱ", "Б").replace("ⰱ", "б") \
+            .replace("Ⰲ", "В").replace("ⰲ", "в") \
+            .replace("Ⰳ", "Г").replace("ⰳ", "г") \
+            .replace("Ⰴ", "Д").replace("ⰴ", "д") \
+            .replace("Ⰵ", "Е").replace("ⰵ", "е") \
+            .replace("Ⰶ", "Ж").replace("ⰶ", "ж") \
+            .replace("Ⰷ", "Ѕ").replace("ⰷ", "ѕ") \
+            .replace("Ⰸ", "З").replace("ⰸ", "з") \
+            .replace("Ⰼ", "Ћ").replace("ⰼ", "ћ") \
+            .replace("Ⰽ", "к").replace("ⰽ", "к") \
+            .replace("Ⰾ", "Л").replace("ⰾ", "л") \
+            .replace("Ⰿ", "М").replace("ⰿ", "м") \
+            .replace("Ⱀ", "Н").replace("ⱀ", "н") \
+            .replace("Ⱁ", "О").replace("ⱁ", "о") \
+            .replace("Ⱂ", "П").replace("ⱂ", "п") \
+            .replace("Ⱃ", "Р").replace("ⱃ", "р") \
+            .replace("Ⱄ", "С").replace("ⱄ", "с") \
+            .replace("Ⱅ", "Т").replace("ⱅ", "т") \
+            .replace("Ⱛ", "Ѵ").replace("ⱛ", "ѵ") \
+            .replace("Ⱆ", "У").replace("ⱆ", "у") \
+            .replace("Ⱇ", "Ф").replace("ⱇ", "ф") \
+            .replace("Ⱈ", "Х").replace("ⱈ", "х") \
+            .replace("Ⱉ", "Ѡ").replace("ⱉ", "ѡ") \
+            .replace("Ⱌ", "Ц").replace("ⱌ", "ц") \
+            .replace("Ⱍ", "Ч").replace("ⱍ", "ч") \
+            .replace("Ⱎ", "Ш").replace("ⱎ", "ш") \
+            .replace("Ⱋ", "Щ").replace("ⱋ", "щ") \
+            .replace("Ⱐ", "Ь").replace("ⱐ", "ь") \
+            .replace("Ⱑ", "Ѣ").replace("ⱑ", "ѣ") \
+            .replace("Ⱖ", "Ё").replace("ⱖ", "ё") \
+            .replace("Ⱓ", "Ю").replace("ⱓ", "ю") \
+            .replace("Ⱔ", "Ѧ").replace("ⱔ", "ѧ") \
+            .replace("Ⱗ", "Ѩ").replace("ⱗ", "ѩ") \
+            .replace("Ⱘ", "Ѫ").replace("ⱘ", "ѫ") \
+            .replace("Ⱙ", "Ѭ").replace("ⱙ", "ѭ") \
             .replace("Ⱚ", "Ѳ").replace("ⱚ", "ѳ")
 
         if y == 1:
@@ -266,22 +329,22 @@ async def translate(message: types.Message):
             kirill = kirill.replace("ⰟⰋ", "Ы").replace("ⱏⰻ", "ы")
 
         if i == 1:
-            kirill = kirill.replace("Ⰺ", "И").replace("ⰺ", "и")\
+            kirill = kirill.replace("Ⰺ", "И").replace("ⰺ", "и") \
                 .replace("Ⰻ", "І").replace("ⰻ", "і")
         elif i == 2:
-            kirill = kirill.replace("Ⰹ", "И").replace("ⰹ", "и")\
+            kirill = kirill.replace("Ⰹ", "И").replace("ⰹ", "и") \
                 .replace("Ⰻ", "І").replace("ⰻ", "і")
         elif i == 3:
-            kirill = kirill.replace("Ⰻ", "И").replace("ⰻ", "и")\
+            kirill = kirill.replace("Ⰻ", "И").replace("ⰻ", "и") \
                 .replace("Ⰺ", "І").replace("ⰺ", "і")
         elif i == 4:
-            kirill = kirill.replace("Ⰻ", "И").replace("ⰻ", "и")\
+            kirill = kirill.replace("Ⰻ", "И").replace("ⰻ", "и") \
                 .replace("Ⰹ", "І").replace("ⰹ", "і")
         elif i == 5:
-            kirill = kirill.replace("Ⰺ", "И").replace("ⰺ", "и")\
+            kirill = kirill.replace("Ⰺ", "И").replace("ⰺ", "и") \
                 .replace("Ⰹ", "І").replace("ⰹ", "і")
         elif i == 6:
-            kirill = kirill.replace("Ⰹ", "И").replace("ⰹ", "и")\
+            kirill = kirill.replace("Ⰹ", "И").replace("ⰹ", "и") \
                 .replace("Ⰺ", "І").replace("ⰺ", "і")
 
         kirill = kirill.replace("Ⱏ", "Ъ").replace("ⱏ", "ъ")
@@ -295,48 +358,64 @@ async def translate(message: types.Message):
 async def inline_translate(inline_query: InlineQuery):
     global i
     global y
-    str = inline_query.query
-    kirilltext = ["А", "а", "Б", "б", "В", "в", "Г", "г", "Д", "д", "Е", "е", "Ж", "ж", "Ѕ", "ѕ", "З", "з", "И", "и", "І", "і", "Ћ", "ћ", "К", "к", "Л", "л", "М", "м", "Н", "н", "О", "о", "П", "п", "Р", "р", "С", "с", "Т", "т", "Ѵ", "ѵ", "У", "у", "Ф", "ф", "Х", "х", "Ѡ", "ѡ", "Ц", "ц", "Ч", "ч", "Ш", "ш", "Щ", "щ", "Ъ", "ъ", "Ы", "ы", "Ь", "ь", "Ѣ", "ѣ", "Ё", "ё", "Ю", "ю", "Ѧ", "ѧ", "Ѩ", "ѩ", "Ѫ", "ѫ", "Ѭ", "ѭ", "Ѳ", "ѳ"]
-    glagoltext = ["Ⰰ", "ⰰ", "Ⰱ", "ⰱ", "Ⰲ", "ⰲ", "Ⰳ", "ⰳ", "Ⰴ", "ⰴ", "Ⰵ", "ⰵ", "Ⰶ", "ⰶ", "Ⰷ", "ⰷ", "Ⰸ", "ⰸ", "Ⰺ", "ⰺ", "Ⰹ", "ⰹ", "Ⰻ", "ⰻ", "Ⰼ", "ⰼ", "Ⰽ", "ⰽ", "Ⰾ", "ⰾ", "Ⰿ", "ⰿ", "Ⱀ", "ⱀ", "Ⱁ", "ⱁ", "Ⱂ", "ⱂ", "Ⱃ", "ⱃ", "Ⱄ", "ⱄ", "Ⱅ", "ⱅ", "Ⱛ", "ⱛ", "Ⱆ", "ⱆ", "Ⱇ", "ⱇ", "ⱇ", "Ⱈ", "ⱈ", "Ⱉ", "ⱉ", "Ⱌ", "ⱌ", "Ⱍ", "ⱍ", "Ⱎ", "ⱎ", "Ⱋ", "ⱋ", "Ⱏ", "ⱏ", "Ⱐ", "ⱐ", "Ⱑ", "ⱑ", "Ⱖ", "ⱖ", "Ⱓ", "ⱓ", "Ⱔ", "ⱔ", "Ⱗ", "ⱗ", "Ⱘ", "ⱘ", "Ⱙ", "ⱙ", "Ⱚ", "ⱚ"]
+    inlinetext = inline_query.query
+    kirilltext = ["А", "а", "Б", "б", "В", "в", "Г", "г", "Д", "д", "Е", "е", "Ж", "ж", "Ѕ", "ѕ", "З", "з", "И", "и",
+                  "І", "і", "Ћ", "ћ", "К", "к", "Л", "л", "М", "м", "Н", "н", "О", "о", "П", "п", "Р", "р", "С", "с",
+                  "Т", "т", "Ѵ", "ѵ", "У", "у", "Ф", "ф", "Х", "х", "Ѡ", "ѡ", "Ц", "ц", "Ч", "ч", "Ш", "ш", "Щ", "щ",
+                  "Ъ", "ъ", "Ы", "ы", "Ь", "ь", "Ѣ", "ѣ", "Ё", "ё", "Ю", "ю", "Ѧ", "ѧ", "Ѩ", "ѩ", "Ѫ", "ѫ", "Ѭ", "ѭ",
+                  "Ѳ", "ѳ"]
+    glagoltext = ["Ⰰ", "ⰰ", "Ⰱ", "ⰱ", "Ⰲ", "ⰲ", "Ⰳ", "ⰳ", "Ⰴ", "ⰴ", "Ⰵ", "ⰵ", "Ⰶ", "ⰶ", "Ⰷ", "ⰷ", "Ⰸ", "ⰸ", "Ⰺ", "ⰺ",
+                  "Ⰹ", "ⰹ", "Ⰻ", "ⰻ", "Ⰼ", "ⰼ", "Ⰽ", "ⰽ", "Ⰾ", "ⰾ", "Ⰿ", "ⰿ", "Ⱀ", "ⱀ", "Ⱁ", "ⱁ", "Ⱂ", "ⱂ", "Ⱃ", "ⱃ",
+                  "Ⱄ", "ⱄ", "Ⱅ", "ⱅ", "Ⱛ", "ⱛ", "Ⱆ", "ⱆ", "Ⱇ", "ⱇ", "ⱇ", "Ⱈ", "ⱈ", "Ⱉ", "ⱉ", "Ⱌ", "ⱌ", "Ⱍ", "ⱍ", "Ⱎ",
+                  "ⱎ", "Ⱋ", "ⱋ", "Ⱏ", "ⱏ", "Ⱐ", "ⱐ", "Ⱑ", "ⱑ", "Ⱖ", "ⱖ", "Ⱓ", "ⱓ", "Ⱔ", "ⱔ", "Ⱗ", "ⱗ", "Ⱘ", "ⱘ", "Ⱙ",
+                  "ⱙ", "Ⱚ", "ⱚ"]
+    global db
+    global i
+    global y
+    if not db.user_exists(inline_query.from_user.id):
+        db.add_user(inline_query.from_user.id, i, y)
 
-    if any(text in str for text in kirilltext):
-        glagol = str.replace("А", "Ⰰ").replace("а", "ⰰ")\
-            .replace("Б", "Ⰱ").replace("б", "ⰱ")\
-            .replace("В", "Ⰲ").replace("в", "ⰲ")\
-            .replace("Г", "Ⰳ").replace("г", "ⰳ")\
-            .replace("Д", "Ⰴ").replace("д", "ⰴ")\
-            .replace("Е", "Ⰵ").replace("е", "ⰵ")\
-            .replace("Ж", "Ⰶ").replace("ж", "ⰶ")\
-            .replace("Ѕ", "Ⰷ").replace("ѕ", "ⰷ")\
-            .replace("З", "Ⰸ").replace("з", "ⰸ")\
-            .replace("Ћ", "Ⰼ").replace("ћ", "ⰼ")\
-            .replace("К", "Ⰽ").replace("к", "ⰽ")\
-            .replace("Л", "Ⰾ").replace("л", "ⰾ")\
-            .replace("М", "Ⰿ").replace("м", "ⰿ")\
-            .replace("Н", "Ⱀ").replace("н", "ⱀ")\
-            .replace("О", "Ⱁ").replace("о", "ⱁ")\
-            .replace("П", "Ⱂ").replace("п", "ⱂ")\
-            .replace("Р", "Ⱃ").replace("р", "ⱃ")\
-            .replace("С", "Ⱄ").replace("с", "ⱄ")\
-            .replace("Т", "Ⱅ").replace("т", "ⱅ")\
-            .replace("Ѵ", "Ⱛ").replace("ѵ", "ⱛ")\
-            .replace("У", "Ⱆ").replace("у", "ⱆ")\
-            .replace("Ф", "Ⱇ").replace("ф", "ⱇ")\
-            .replace("Х", "Ⱈ").replace("х", "ⱈ")\
-            .replace("Ѡ", "Ⱉ").replace("ѡ", "ⱉ")\
-            .replace("Ц", "Ⱌ").replace("ц", "ⱌ")\
-            .replace("Ч", "Ⱍ").replace("ч", "ⱍ")\
-            .replace("Ш", "Ⱎ").replace("ш", "ⱎ")\
-            .replace("Щ", "Ⱋ").replace("щ", "ⱋ")\
-            .replace("Ъ", "Ⱏ").replace("ъ", "ⱏ")\
-            .replace("Ь", "Ⱐ").replace("ь", "ⱐ")\
-            .replace("Ѣ", "Ⱑ").replace("ѣ", "ⱑ")\
-            .replace("Ё", "Ⱖ").replace("ё", "ⱖ")\
-            .replace("Ю", "Ⱓ").replace("ю", "ⱓ")\
-            .replace("Ѧ", "Ⱔ").replace("ѧ", "ⱔ")\
-            .replace("Ѩ", "Ⱗ").replace("ѩ", "ⱗ")\
-            .replace("Ѫ", "Ⱘ").replace("ѫ", "ⱘ")\
-            .replace("Ѭ", "Ⱙ").replace("ѭ", "ⱙ")\
+    db.set_user_settingi(inline_query.from_user.id)
+    db.set_user_settingy(inline_query.from_user.id)
+
+    if any(text in inlinetext for text in kirilltext):
+        glagol = inlinetext.replace("А", "Ⰰ").replace("а", "ⰰ") \
+            .replace("Б", "Ⰱ").replace("б", "ⰱ") \
+            .replace("В", "Ⰲ").replace("в", "ⰲ") \
+            .replace("Г", "Ⰳ").replace("г", "ⰳ") \
+            .replace("Д", "Ⰴ").replace("д", "ⰴ") \
+            .replace("Е", "Ⰵ").replace("е", "ⰵ") \
+            .replace("Ж", "Ⰶ").replace("ж", "ⰶ") \
+            .replace("Ѕ", "Ⰷ").replace("ѕ", "ⰷ") \
+            .replace("З", "Ⰸ").replace("з", "ⰸ") \
+            .replace("Ћ", "Ⰼ").replace("ћ", "ⰼ") \
+            .replace("К", "Ⰽ").replace("к", "ⰽ") \
+            .replace("Л", "Ⰾ").replace("л", "ⰾ") \
+            .replace("М", "Ⰿ").replace("м", "ⰿ") \
+            .replace("Н", "Ⱀ").replace("н", "ⱀ") \
+            .replace("О", "Ⱁ").replace("о", "ⱁ") \
+            .replace("П", "Ⱂ").replace("п", "ⱂ") \
+            .replace("Р", "Ⱃ").replace("р", "ⱃ") \
+            .replace("С", "Ⱄ").replace("с", "ⱄ") \
+            .replace("Т", "Ⱅ").replace("т", "ⱅ") \
+            .replace("Ѵ", "Ⱛ").replace("ѵ", "ⱛ") \
+            .replace("У", "Ⱆ").replace("у", "ⱆ") \
+            .replace("Ф", "Ⱇ").replace("ф", "ⱇ") \
+            .replace("Х", "Ⱈ").replace("х", "ⱈ") \
+            .replace("Ѡ", "Ⱉ").replace("ѡ", "ⱉ") \
+            .replace("Ц", "Ⱌ").replace("ц", "ⱌ") \
+            .replace("Ч", "Ⱍ").replace("ч", "ⱍ") \
+            .replace("Ш", "Ⱎ").replace("ш", "ⱎ") \
+            .replace("Щ", "Ⱋ").replace("щ", "ⱋ") \
+            .replace("Ъ", "Ⱏ").replace("ъ", "ⱏ") \
+            .replace("Ь", "Ⱐ").replace("ь", "ⱐ") \
+            .replace("Ѣ", "Ⱑ").replace("ѣ", "ⱑ") \
+            .replace("Ё", "Ⱖ").replace("ё", "ⱖ") \
+            .replace("Ю", "Ⱓ").replace("ю", "ⱓ") \
+            .replace("Ѧ", "Ⱔ").replace("ѧ", "ⱔ") \
+            .replace("Ѩ", "Ⱗ").replace("ѩ", "ⱗ") \
+            .replace("Ѫ", "Ⱘ").replace("ѫ", "ⱘ") \
+            .replace("Ѭ", "Ⱙ").replace("ѭ", "ⱙ") \
             .replace("Ѳ", "Ⱚ").replace("ѳ", "ⱚ")
 
         if y == 1:
@@ -347,69 +426,69 @@ async def inline_translate(inline_query: InlineQuery):
             glagol = glagol.replace("Ы", "ⰟⰋ").replace("ы", "ⱏⰻ")
 
         if i == 1:
-            glagol = glagol.replace("И", "Ⰺ").replace("и", "ⰺ")\
+            glagol = glagol.replace("И", "Ⰺ").replace("и", "ⰺ") \
                 .replace("І", "Ⰻ").replace("і", "ⰻ")
         elif i == 2:
-            glagol = glagol.replace("И", "Ⰹ").replace("и", "ⰹ")\
+            glagol = glagol.replace("И", "Ⰹ").replace("и", "ⰹ") \
                 .replace("І", "Ⰻ").replace("і", "ⰻ")
         elif i == 3:
-            glagol = glagol.replace("И", "Ⰻ").replace("и", "ⰻ")\
+            glagol = glagol.replace("И", "Ⰻ").replace("и", "ⰻ") \
                 .replace("І", "Ⰺ").replace("і", "ⰺ")
         elif i == 4:
-            glagol = glagol.replace("И", "Ⰻ").replace("и", "ⰻ")\
+            glagol = glagol.replace("И", "Ⰻ").replace("и", "ⰻ") \
                 .replace("І", "Ⰹ").replace("і", "ⰹ")
         elif i == 5:
-            glagol = glagol.replace("И", "Ⰺ").replace("и", "ⰺ")\
+            glagol = glagol.replace("И", "Ⰺ").replace("и", "ⰺ") \
                 .replace("І", "Ⰹ").replace("і", "ⰹ")
         elif i == 6:
-            glagol = glagol.replace("И", "Ⰹ").replace("и", "ⰹ")\
+            glagol = glagol.replace("И", "Ⰹ").replace("и", "ⰹ") \
                 .replace("І", "Ⰺ").replace("і", "ⰺ")
 
         input_content = InputTextMessageContent(glagol)
         result_id: str = hashlib.md5(glagol.encode()).hexdigest()
         result = InlineQueryResultArticle(
-            id = result_id,
-            title = f"Перевод {glagol!r}",
-            input_message_content = input_content,
+            id=result_id,
+            title=f"Перевод {glagol!r}",
+            input_message_content=input_content,
         )
         await bot.answer_inline_query(inline_query.id, results=[result], cache_time=1)
-    elif any(text in str for text in glagoltext):
-        kirill = str.replace("Ⰰ", "А").replace("ⰰ", "а")\
-            .replace("Ⰱ", "Б").replace("ⰱ", "б")\
-            .replace("Ⰲ", "В").replace("ⰲ", "в")\
-            .replace("Ⰳ", "Г").replace("ⰳ", "г")\
-            .replace("Ⰴ", "Д").replace("ⰴ", "д")\
-            .replace("Ⰵ", "Е").replace("ⰵ", "е")\
-            .replace("Ⰶ", "Ж").replace("ⰶ", "ж")\
-            .replace("Ⰷ", "Ѕ").replace("ⰷ", "ѕ")\
-            .replace("Ⰸ", "З").replace("ⰸ", "з")\
-            .replace("Ⰼ", "Ћ").replace("ⰼ", "ћ")\
-            .replace("Ⰽ", "к").replace("ⰽ", "к")\
-            .replace("Ⰾ", "Л").replace("ⰾ", "л")\
-            .replace("Ⰿ", "М").replace("ⰿ", "м")\
-            .replace("Ⱀ", "Н").replace("ⱀ", "н")\
-            .replace("Ⱁ", "О").replace("ⱁ", "о")\
-            .replace("Ⱂ", "П").replace("ⱂ", "п")\
-            .replace("Ⱃ", "Р").replace("ⱃ", "р")\
-            .replace("Ⱄ", "С").replace("ⱄ", "с")\
-            .replace("Ⱅ", "Т").replace("ⱅ", "т")\
-            .replace("Ⱛ", "Ѵ").replace("ⱛ", "ѵ")\
-            .replace("Ⱆ", "У").replace("ⱆ", "у")\
-            .replace("Ⱇ", "Ф").replace("ⱇ", "ф")\
-            .replace("Ⱈ", "Х").replace("ⱈ", "х")\
-            .replace("Ⱉ", "Ѡ").replace("ⱉ", "ѡ")\
-            .replace("Ⱌ", "Ц").replace("ⱌ", "ц")\
-            .replace("Ⱍ", "Ч").replace("ⱍ", "ч")\
-            .replace("Ⱎ", "Ш").replace("ⱎ", "ш")\
-            .replace("Ⱋ", "Щ").replace("ⱋ", "щ")\
-            .replace("Ⱐ", "Ь").replace("ⱐ", "ь")\
-            .replace("Ⱑ", "Ѣ").replace("ⱑ", "ѣ")\
-            .replace("Ⱖ", "Ё").replace("ⱖ", "ё")\
-            .replace("Ⱓ", "Ю").replace("ⱓ", "ю")\
-            .replace("Ⱔ", "Ѧ").replace("ⱔ", "ѧ")\
-            .replace("Ⱗ", "Ѩ").replace("ⱗ", "ѩ")\
-            .replace("Ⱘ", "Ѫ").replace("ⱘ", "ѫ")\
-            .replace("Ⱙ", "Ѭ").replace("ⱙ", "ѭ")\
+    elif any(text in inlinetext for text in glagoltext):
+        kirill = inlinetext.replace("Ⰰ", "А").replace("ⰰ", "а") \
+            .replace("Ⰱ", "Б").replace("ⰱ", "б") \
+            .replace("Ⰲ", "В").replace("ⰲ", "в") \
+            .replace("Ⰳ", "Г").replace("ⰳ", "г") \
+            .replace("Ⰴ", "Д").replace("ⰴ", "д") \
+            .replace("Ⰵ", "Е").replace("ⰵ", "е") \
+            .replace("Ⰶ", "Ж").replace("ⰶ", "ж") \
+            .replace("Ⰷ", "Ѕ").replace("ⰷ", "ѕ") \
+            .replace("Ⰸ", "З").replace("ⰸ", "з") \
+            .replace("Ⰼ", "Ћ").replace("ⰼ", "ћ") \
+            .replace("Ⰽ", "к").replace("ⰽ", "к") \
+            .replace("Ⰾ", "Л").replace("ⰾ", "л") \
+            .replace("Ⰿ", "М").replace("ⰿ", "м") \
+            .replace("Ⱀ", "Н").replace("ⱀ", "н") \
+            .replace("Ⱁ", "О").replace("ⱁ", "о") \
+            .replace("Ⱂ", "П").replace("ⱂ", "п") \
+            .replace("Ⱃ", "Р").replace("ⱃ", "р") \
+            .replace("Ⱄ", "С").replace("ⱄ", "с") \
+            .replace("Ⱅ", "Т").replace("ⱅ", "т") \
+            .replace("Ⱛ", "Ѵ").replace("ⱛ", "ѵ") \
+            .replace("Ⱆ", "У").replace("ⱆ", "у") \
+            .replace("Ⱇ", "Ф").replace("ⱇ", "ф") \
+            .replace("Ⱈ", "Х").replace("ⱈ", "х") \
+            .replace("Ⱉ", "Ѡ").replace("ⱉ", "ѡ") \
+            .replace("Ⱌ", "Ц").replace("ⱌ", "ц") \
+            .replace("Ⱍ", "Ч").replace("ⱍ", "ч") \
+            .replace("Ⱎ", "Ш").replace("ⱎ", "ш") \
+            .replace("Ⱋ", "Щ").replace("ⱋ", "щ") \
+            .replace("Ⱐ", "Ь").replace("ⱐ", "ь") \
+            .replace("Ⱑ", "Ѣ").replace("ⱑ", "ѣ") \
+            .replace("Ⱖ", "Ё").replace("ⱖ", "ё") \
+            .replace("Ⱓ", "Ю").replace("ⱓ", "ю") \
+            .replace("Ⱔ", "Ѧ").replace("ⱔ", "ѧ") \
+            .replace("Ⱗ", "Ѩ").replace("ⱗ", "ѩ") \
+            .replace("Ⱘ", "Ѫ").replace("ⱘ", "ѫ") \
+            .replace("Ⱙ", "Ѭ").replace("ⱙ", "ѭ") \
             .replace("Ⱚ", "Ѳ").replace("ⱚ", "ѳ")
 
         if y == 1:
@@ -420,22 +499,22 @@ async def inline_translate(inline_query: InlineQuery):
             kirill = kirill.replace("ⰟⰋ", "Ы").replace("ⱏⰻ", "ы")
 
         if i == 1:
-            kirill = kirill.replace("Ⰺ", "И").replace("ⰺ", "и")\
+            kirill = kirill.replace("Ⰺ", "И").replace("ⰺ", "и") \
                 .replace("Ⰻ", "І").replace("ⰻ", "і")
         elif i == 2:
-            kirill = kirill.replace("Ⰹ", "И").replace("ⰹ", "и")\
+            kirill = kirill.replace("Ⰹ", "И").replace("ⰹ", "и") \
                 .replace("Ⰻ", "І").replace("ⰻ", "і")
         elif i == 3:
-            kirill = kirill.replace("Ⰻ", "И").replace("ⰻ", "и")\
+            kirill = kirill.replace("Ⰻ", "И").replace("ⰻ", "и") \
                 .replace("Ⰺ", "І").replace("ⰺ", "і")
         elif i == 4:
-            kirill = kirill.replace("Ⰻ", "И").replace("ⰻ", "и")\
+            kirill = kirill.replace("Ⰻ", "И").replace("ⰻ", "и") \
                 .replace("Ⰹ", "І").replace("ⰹ", "і")
         elif i == 5:
-            kirill = kirill.replace("Ⰺ", "И").replace("ⰺ", "и")\
+            kirill = kirill.replace("Ⰺ", "И").replace("ⰺ", "и") \
                 .replace("Ⰹ", "І").replace("ⰹ", "і")
         elif i == 6:
-            kirill = kirill.replace("Ⰹ", "И").replace("ⰹ", "и")\
+            kirill = kirill.replace("Ⰹ", "И").replace("ⰹ", "и") \
                 .replace("Ⰺ", "І").replace("ⰺ", "і")
 
         kirill = kirill.replace("Ⱏ", "Ъ").replace("ⱏ", "ъ")
@@ -482,6 +561,7 @@ async def inline_translate(inline_query: InlineQuery):
             reply_markup=settingsy
         )
         await bot.answer_inline_query(inline_query.id, results=[resulti, resulty], cache_time=1)
+
 
 if __name__ == "__main__":
     executor.start_polling(dp)
